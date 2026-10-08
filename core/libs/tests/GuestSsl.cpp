@@ -4,6 +4,7 @@
 
 extern "C" {
 int APS5_VABI sceSslInit_nid_postfix(std::size_t);
+int APS5_VABI sceSslClose(int);
 int APS5_VABI sceSslGetCaCerts(int, void*);
 int APS5_VABI sceSslFreeCaCerts(int, void*);
 int APS5_VABI sceSslGetSerialNumber(void*, const char**, unsigned*);
@@ -29,6 +30,8 @@ int main() {
 
     const int context = sceSslInit_nid_postfix(0x10000);
     Require(context > 0);
+    Require(sceSslClose(context) == 0);
+    Require(sceSslClose(0) == 0);
     Require(sceSslGetCaCerts(context, nullptr) == invalidArg);
     Require(sceSslFreeCaCerts(context, nullptr) == invalidArg);
 

@@ -24,12 +24,15 @@ int APS5_VABI sceAgcDriverRequestCaptureStart(const char* path) {
     return static_cast<int>(0x8A6C9018);
 }
 
+
 int APS5_VABI sceAgcDriverRequestCaptureStop() {
     return static_cast<int>(0x8A6C9018);
 }
 
+
 int APS5_VABI sceAgcDriverTriggerCapture() {
     return static_cast<int>(0x8A6C9018);
 }
+
 
 }

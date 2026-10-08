@@ -13,8 +13,7 @@
 extern "C" {
 
 // unknown signature
-APS5_EXPORT("gQkqkLttcpw", sceAgcAcb_gQkqkLttcpw);
-void* APS5_VABI sceAgcAcb_gQkqkLttcpw (void) {
+void* APS5_VABI sceAgcAcbAtomicGds_0900(void) {
     NotImplemented_nid_no_patch(__func__);
     return nullptr;
 }
@@ -56,6 +55,7 @@ std::uint32_t* APS5_VABI sceAgcAcbWaitUntilSafeForRendering(CommandBuffer* buf, 
     return packet;
 }
 
+
 std::uint32_t* APS5_VABI sceAgcAcbSetFlip(CommandBuffer* buf, std::uint32_t videoOutHandle, std::int32_t displayBufferIndex, std::uint32_t flipMode, std::int64_t flipArg) {
     auto* packet = Agc::Command::Allocate(buf, AgcDriver::FlipPacketWords, __func__);
     packet[0] = AgcDriver::FlipPacketHeader;
@@ -66,6 +66,7 @@ std::uint32_t* APS5_VABI sceAgcAcbSetFlip(CommandBuffer* buf, std::uint32_t vide
     packet[5] = static_cast<std::uint32_t>(static_cast<std::uint64_t>(flipArg) >> 32u);
     return packet;
 }
+
 
 uint32_t* APS5_VABI sceAgcAcbPushMarker(CommandBuffer* buf, const char* str, uint32_t color) {
     (void)color;
@@ -79,17 +80,6 @@ uint32_t* APS5_VABI sceAgcAcbPopMarker(CommandBuffer* buf) {
 uint32_t* APS5_VABI sceAgcAcbSetMarker(CommandBuffer* buf, const char* str, uint32_t color) {
     (void)color;
     auto* packet = Agc::Marker::Push(buf, str, __func__);
-    Agc::Marker::Pop(buf, __func__);
-    return packet;
-}
-
-uint32_t* APS5_VABI sceAgcAcbPushMarkerSpan(CommandBuffer* buf, const void* text, uint32_t byte_count, uint32_t color) {
-    (void)color;
-    return Agc::Marker::PushSpan(buf, text, byte_count, __func__);
-}
-
-uint32_t* APS5_VABI sceAgcAcbSetMarkerSpan(CommandBuffer* buf, const void* text, uint32_t byte_count) {
-    auto* packet = Agc::Marker::PushSpan(buf, text, byte_count, __func__);
     Agc::Marker::Pop(buf, __func__);
     return packet;
 }

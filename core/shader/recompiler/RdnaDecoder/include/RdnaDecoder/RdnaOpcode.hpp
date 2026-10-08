@@ -37,8 +37,6 @@ enum class RdnaOpcode : std::uint16_t {
     SBranch,
     SSetpcB64,
     SSwappcB64,
-    SRfeB64,
-    SCallB64,
     SEndpgm,
     SWaitcnt,
     SBarrier,
@@ -206,6 +204,7 @@ enum class RdnaOpcode : std::uint16_t {
     SMovrelsd2B32,
     SQuadmaskB64,
     SGetpcB64,
+    SCallB64,
     SSubvectorLoopBegin,
     SSubvectorLoopEnd,
     SAndSaveexecB32,
@@ -871,14 +870,6 @@ enum class RdnaOpcode : std::uint16_t {
     DsSwizzleB32,
     DsBpermuteB32,
     DsPermuteB32,
-    DsGwsSemaReleaseAll,
-    DsGwsInit,
-    DsGwsSemaV,
-    DsGwsSemaBr,
-    DsGwsSemaP,
-    DsGwsBarrier,
-    DsOrderedCount,
-    DsCondxchg32RtnB64,
     DsConsume,
     DsAppend,
     DsReadI8,
@@ -943,6 +934,7 @@ enum class RdnaOpcode : std::uint16_t {
     DsXorRtnB64,
     DsMskorRtnB64,
     DsWrxchgRtnB64,
+    DsCondxchg32RtnB64,
     DsCmpstRtnB64,
     DsCmpstRtnF64,
     DsMinRtnF64,
@@ -1031,9 +1023,6 @@ enum class RdnaOpcode : std::uint16_t {
     SSleep,
     SWakeup,
     STrap,
-    SSendmsghalt,
-    SSethalt,
-    SCodeEnd,
     STtracedata,
     SInstPrefetch,
     SClause,
@@ -1058,6 +1047,17 @@ enum class RdnaOpcode : std::uint16_t {
     Exp,
     VMulHiI32I24,
     VMulHiU32U24,
+    SSethalt,
+    SSendmsghalt,
+    SCodeEnd,
+    SRfeB64,
+    DsGwsInit,
+    DsGwsSemaV,
+    DsGwsSemaBr,
+    DsGwsSemaP,
+    DsGwsSemaReleaseAll,
+    DsGwsBarrier,
+    DsOrderedCount,
     Count
 };
 
@@ -1072,6 +1072,10 @@ enum class RdnaOpcode : std::uint16_t {
 
 bool IsConditionalBranchOpcode(RdnaOpcode opcode);
 bool IsDirectBranchOpcode(RdnaOpcode opcode);
+
+[[nodiscard]] inline bool IsSetpcOpcode(RdnaOpcode opcode) {
+    return opcode == RdnaOpcode::SSetpcB64 || opcode == RdnaOpcode::SSwappcB64;
+}
 
 }
 

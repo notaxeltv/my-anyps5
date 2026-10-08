@@ -18,6 +18,7 @@ int APS5_VABI sceAjmInstanceDestroy(std::uint32_t, std::uint32_t);
 int APS5_VABI sceAjmBatchInitialize(void*, std::size_t, AjmBatchInfo*);
 int APS5_VABI sceAjmBatchJobInitialize(AjmBatchInfo*, std::uint32_t, const void*, std::size_t, void*);
 int APS5_VABI sceAjmBatchJobDecode(AjmBatchInfo*, std::uint32_t, const void*, std::size_t, void*, std::size_t, void*);
+int APS5_VABI sceAjmBatchJobDecodeSplit(AjmBatchInfo*, std::uint32_t, const AjmBuffer*, std::size_t, const AjmBuffer*, std::size_t, void*);
 int APS5_VABI sceAjmBatchJobDecodeSingle(AjmBatchInfo*, std::uint32_t, const void*, std::size_t, void*, std::size_t, void*);
 int APS5_VABI sceAjmBatchJobRun(AjmBatchInfo*, std::uint32_t, std::uint64_t, const void*, std::size_t, void*, std::size_t, void*, std::size_t);
 int APS5_VABI sceAjmBatchJobSetGaplessDecode(AjmBatchInfo*, std::uint32_t, const void*, int, void*);
@@ -350,6 +351,22 @@ bool Refused(std::uint32_t context, const AjmBatchInfo& info) {
         return true;
     }
     return false;
+}
+
+void TestDecodeSplit(std::uint32_t context) {
+    std::uint32_t instance = 0;
+    Require(sceAjmInstanceCreate(context, 0, 0, &instance) == 0);
+    std::vector<std::uint8_t> batch(0x40);
+    std::vector<std::int16_t> pcm(1152);
+    AjmBatchInfo info{};
+    DecodeSideband sideband{};
+    AjmBuffer input{const_cast<std::uint8_t*>(MP3_MONO), sizeof(MP3_MONO)};
+    AjmBuffer output{pcm.data(), pcm.size() * sizeof(std::int16_t)};
+    Require(sceAjmBatchInitialize(batch.data(), batch.size(), &info) == 0);
+    Require(sceAjmBatchJobDecodeSplit(&info, instance, &input, 1, &output, 1, &sideband) == 0);
+    Submit(context, info);
+    Require(sideband.result == 0 && sideband.inputConsumed == 96 && sideband.outputWritten == 1152 * 2 && sideband.totalDecodedSamples == 1152);
+    Require(sceAjmInstanceDestroy(context, instance) == 0);
 }
 
 void TestDecodeSingle(std::uint32_t context) {
@@ -896,6 +913,7 @@ int main() {
     TestMp3ParseOfl();
     TestMp3(context);
     TestOpus(context);
+    TestDecodeSplit(context);
     TestDecodeSingle(context);
     TestGaplessDecode(context);
     TestCodecInfo(context);

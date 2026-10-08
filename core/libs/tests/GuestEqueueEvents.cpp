@@ -18,6 +18,7 @@ int APS5_VABI sceKernelDeleteTimerEvent(KernelEqueue eq, int id);
 intptr_t APS5_VABI sceKernelGetEventData(const KernelEvent* ev);
 intptr_t APS5_VABI sceKernelGetEventFflags(const KernelEvent* ev);
 int APS5_VABI sceKernelGetEventFilter(const KernelEvent* ev);
+int APS5_VABI sceKernelGetEventError(const KernelEvent* ev);
 uintptr_t APS5_VABI sceKernelGetEventId(const KernelEvent* ev);
 void* APS5_VABI sceKernelGetEventUserData(const KernelEvent* ev);
 }
@@ -143,6 +144,7 @@ int main() {
     Require(sceKernelGetEventData(&userEvent) == reinterpret_cast<intptr_t>(&payload));
     Require(sceKernelGetEventUserData(&userEvent) == &payload);
     Require(sceKernelGetEventFflags(&userEvent) == 0);
+    Require(sceKernelGetEventError(&userEvent) == 0);
     Require(sceKernelDeleteUserEvent(eq, 7) == SCE_OK);
 
     KernelEvent timerEvent{};
@@ -164,9 +166,11 @@ int main() {
     Require(sceKernelGetEventFilter(&rawEvent) == INT16_MIN);
     Require(sceKernelGetEventFflags(&rawEvent) == static_cast<intptr_t>(0x80000001LL));
     Require(sceKernelGetEventData(&rawEvent) == -5);
+    Require(sceKernelGetEventError(&rawEvent) == 0);
     Require(sceKernelGetEventUserData(&rawEvent) == nullptr);
 
     Require(RejectsNull(sceKernelGetEventData));
+    Require(RejectsNull(sceKernelGetEventError));
     Require(RejectsNull(sceKernelGetEventFflags));
     Require(RejectsNull(sceKernelGetEventFilter));
     Require(RejectsNull(sceKernelGetEventId));

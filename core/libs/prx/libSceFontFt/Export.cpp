@@ -31,9 +31,6 @@ int APS5_VABI sceFontFtSetAliasPath() {
     return 0;
 }
 
-// Format-support exports take no arguments, as cellFontFtSupport* in RPCS3.
-// FreeType already opens TrueType/OpenType; the other format flags are accepted
-// and ignored, matching LibrarySupport which does not filter by format bit.
 static int SupportFormat() {
     return 0;
 }
@@ -42,57 +39,71 @@ int APS5_VABI sceFontFtSupportBdf() {
     return SupportFormat();
 }
 
+
 int APS5_VABI sceFontFtSupportCid() {
     return SupportFormat();
 }
+
 
 int APS5_VABI sceFontFtSupportFontFormats() {
     return SupportFormat();
 }
 
+
 int APS5_VABI sceFontFtSupportOpenType() {
     return SupportFormat();
 }
+
 
 int APS5_VABI sceFontFtSupportOpenTypeOtf() {
     return SupportFormat();
 }
 
+
 int APS5_VABI sceFontFtSupportOpenTypeTtf() {
     return SupportFormat();
 }
+
 
 int APS5_VABI sceFontFtSupportPcf() {
     return SupportFormat();
 }
 
+
 int APS5_VABI sceFontFtSupportPfr() {
     return SupportFormat();
 }
+
 
 int APS5_VABI sceFontFtSupportSystemFonts() {
     return SupportFormat();
 }
 
+
 int APS5_VABI sceFontFtSupportTrueType() {
     return SupportFormat();
 }
+
 
 int APS5_VABI sceFontFtSupportTrueTypeGx() {
     return SupportFormat();
 }
 
+
 int APS5_VABI sceFontFtSupportType1() {
     return SupportFormat();
 }
+
 
 int APS5_VABI sceFontFtSupportType42() {
     return SupportFormat();
 }
 
+
 int APS5_VABI sceFontFtSupportWinFonts() {
     return SupportFormat();
 }
+
 
 int APS5_VABI sceFontFtTermAliases() {
     NotImplemented_nid_no_patch(__func__);

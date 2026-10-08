@@ -16,6 +16,7 @@ int APS5_VABI sceAgcDriverSubmitCommandBuffer(void* queue_context, const Packet*
     return 0;
 }
 
+
 int APS5_VABI sceAgcDriverSubmitMultiCommandBuffers(void* queue_context, uint32_t* const* command_buffers, const uint32_t* sizes_in_dwords, uint32_t count) {
     (void)queue_context;
     if (count == 0) return 0;
@@ -28,5 +29,6 @@ int APS5_VABI sceAgcDriverSubmitMultiCommandBuffers(void* queue_context, uint32_
     }
     return 0;
 }
+
 
 }

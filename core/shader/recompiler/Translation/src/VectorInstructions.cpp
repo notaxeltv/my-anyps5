@@ -21,6 +21,9 @@ bool roundsProductSeparately(const RdnaInstruction& inst) {
 }
 
 bool TranslationContext::emitVector(const RdnaInstruction& inst) {
+    if (emitInterpolation(inst)) {
+        return true;
+    }
     switch (inst.op) {
     case RdnaOpcode::VNop:
     case RdnaOpcode::VPipeflush:

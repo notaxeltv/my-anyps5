@@ -2263,6 +2263,23 @@ RdnaInstruction DecodeRdnaVop3(std::uint32_t programCounter, std::span<const std
     } else {
         instruction.destination = DecodeRdnaVectorGpr(vdst);
     }
+    if (instruction.op == RdnaOpcode::VInterpP1llF16 || instruction.op == RdnaOpcode::VInterpP1lvF16 || instruction.op == RdnaOpcode::VInterpP2F16) {
+        instruction.source0 = DecodeRdnaScalarSource(src0, programCounter);
+        const auto attrChan = src1 & 0xffu;
+        instruction.source1.kind = RdnaOperandKind::IntegerInlineConstant;
+        instruction.source1.value = (attrChan >> 2u) & 0x3fu;
+        instruction.source1.signedVal = static_cast<std::int32_t>(instruction.source1.value);
+        instruction.source2.kind = RdnaOperandKind::IntegerInlineConstant;
+        instruction.source2.value = attrChan & 0x3u;
+        instruction.source2.signedVal = static_cast<std::int32_t>(instruction.source2.value);
+        instruction.sourceCount = 3;
+        if (instruction.op != RdnaOpcode::VInterpP1llF16) {
+            instruction.source3 = DecodeRdnaScalarSource(src2, programCounter);
+            instruction.sourceCount = 4;
+        }
+        ReadRdnaLiteralOperands(code, wordIndex, instruction);
+        return instruction;
+    }
     instruction.source0 = DecodeRdnaScalarSource(src0, programCounter);
     instruction.destination.clamp = (supportsNativeVop3Clamp(instruction.op) || vop3bMadU64) && clamp != 0u;
     instruction.destination.omod = nativeResultModifiers ? omod : 0u;

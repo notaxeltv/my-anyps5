@@ -12,9 +12,9 @@ class TranslationContext {
 public:
     TranslationContext(IrProgram& program, IrBlock& block, std::uint32_t vectorLimit);
 
+    void TranslateEmbeddedFetch(const RdnaInstruction& instruction, std::uint32_t attribute, std::uint32_t components);
     void TranslateInstruction(const RdnaInstruction& instruction);
     void SetPixelInput(const ShaderPixelInputInfo* info, bool barycentricEnabled) { pixelInput = info; fragmentShaderBarycentricEnabled = barycentricEnabled; }
-    void TranslateEmbeddedFetch(const RdnaInstruction& instruction, std::uint32_t attribute, std::uint32_t componentCount, const ShaderBufferResource& resource);
     void AddBranchCondition(const BasicBlock& source, BlockInfo& info);
     void TranslateCodeTableLoad(const RdnaInstruction& instruction, const ControlFlowGraph::CodeTableLoad& table);
 
@@ -38,6 +38,7 @@ private:
     RdnaOperand scalarDestinationOperand(const RdnaOperand& operand, std::uint32_t offset);
     RdnaOperand plainOperand(const RdnaOperand& operand);
     std::array<IrU32, 2> ballotMask(IrU1 value);
+    IrU32 hostExecWord(std::uint32_t half);
     IrU32 readRawU32(const RdnaOperand& operand);
     IrU32 readScalarCode(std::uint32_t code);
     IrU32 applyBitSourceModifiers(const RdnaOperand& operand, IrU32 value);
@@ -116,6 +117,7 @@ private:
     bool dsWrite2(const RdnaInstruction& inst);
     bool dsAtomic2(const RdnaInstruction& inst, IrOpcode opcode, bool returnsValue);
     bool dsAtomic64(const RdnaInstruction& inst, IrOpcode opcode, bool returnsValue);
+    bool dsCondxchg32(const RdnaInstruction& inst);
     bool dsAppendConsume(const RdnaInstruction& inst, IrOpcode opcode);
     bool dsAddtid(const RdnaInstruction& inst, bool write);
     bool globalAddtid(const RdnaInstruction& inst, bool write);
@@ -292,6 +294,11 @@ private:
     void vInterpP1F32(const RdnaInstruction& inst);
     void vInterpP2F32(const RdnaInstruction& inst);
     void vInterpMovF32(const RdnaInstruction& inst);
+    IrValue& barycentricP1(const RdnaInstruction& inst, std::uint32_t attr, std::uint32_t chan);
+    IrU32 packF16FromF32(IrValue& value);
+    void vInterpP1llF16(const RdnaInstruction& inst);
+    void vInterpP1lvF16(const RdnaInstruction& inst);
+    void vInterpP2F16(const RdnaInstruction& inst);
     void eXP(const RdnaInstruction& inst);
     bool emitScalar(const RdnaInstruction& inst);
     bool emitVector(const RdnaInstruction& inst);

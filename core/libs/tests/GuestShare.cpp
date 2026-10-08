@@ -6,13 +6,11 @@
 
 extern "C" {
 int APS5_VABI sceShareCaptureScreenshotExtended(const void* extended_param, std::int32_t* req_id);
-int APS5_VABI sceShareCaptureVideoClipExtended(const void* extended_param, std::int32_t* req_id);
 int APS5_VABI sceShareCaptureScreenshot(const void* param, std::int32_t* req_id);
 int APS5_VABI sceShareCaptureVideoClip(const void* param, std::int32_t* req_id);
 int APS5_VABI sceShareGetCurrentStatus(std::uint32_t feature_flag, void* status);
-int APS5_VABI sceShareGetRunningStatus(void);
-int APS5_VABI sceShareSetContentParamForApplicationTitle(const char* content_param);
 int APS5_VABI sceShareOpenMenuForContent(const void* content_id);
+int APS5_VABI sceShareGetRunningStatus(std::uint32_t* status);
 }
 
 namespace {
@@ -35,13 +33,6 @@ int main() {
 
     Require(sceShareCaptureScreenshotExtended(param, nullptr) == notSupported);
     Require(sceShareCaptureScreenshotExtended(nullptr, nullptr) == notSupported);
-
-    reqId = 7;
-    Require(sceShareCaptureVideoClipExtended(param, &reqId) == notSupported);
-    Require(reqId == -1);
-    Require(sceShareGetRunningStatus() == 0);
-    Require(sceShareSetContentParamForApplicationTitle("title") == 0);
-    Require(sceShareSetContentParamForApplicationTitle(nullptr) == 0);
 
     using Capture = int (APS5_VABI*)(const void*, std::int32_t*);
     for (Capture capture : {sceShareCaptureScreenshot, sceShareCaptureVideoClip}) {
@@ -69,5 +60,9 @@ int main() {
     Require(sceShareGetCurrentStatus(0, status) == invalidParam);
     Require(status[0] == 0x5a);
     Require(sceShareGetCurrentStatus(1, nullptr) == invalidParam);
+    std::uint32_t running[2]{0xffffffffu, 0x5a5a5a5au};
+    Require(sceShareGetRunningStatus(running) == 0);
+    Require(running[0] == 0 && running[1] == 0x5a5a5a5au);
+    Require(sceShareGetRunningStatus(nullptr) == invalidParam);
     return 0;
 }

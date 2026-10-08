@@ -139,7 +139,7 @@ RdnaProgram DecodeRdnaFrontProgram(std::span<const std::uint32_t> front) {
             return result;
         }
 
-        if (instruction.op == RdnaOpcode::SEndpgm || instruction.op == RdnaOpcode::SCodeEnd || instruction.op == RdnaOpcode::SSethalt || instruction.op == RdnaOpcode::SSendmsghalt) {
+        if (instruction.op == RdnaOpcode::SEndpgm) {
             throw std::invalid_argument("front program reached s_endpgm before s_setpc_b64");
         }
     }
@@ -168,7 +168,7 @@ void DecodeRdnaProgram(std::span<const std::uint32_t> code, RdnaProgram& program
             furthestBranchTarget = std::max(furthestBranchTarget, targetIndex);
         }
 
-        if ((instruction.op == RdnaOpcode::SEndpgm || instruction.op == RdnaOpcode::SCodeEnd || instruction.op == RdnaOpcode::SSethalt || instruction.op == RdnaOpcode::SSendmsghalt) && furthestBranchTarget < wordIndex) {
+        if ((instruction.op == RdnaOpcode::SEndpgm || instruction.op == RdnaOpcode::SCodeEnd) && furthestBranchTarget < wordIndex) {
             return;
         }
     }

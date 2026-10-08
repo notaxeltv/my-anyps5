@@ -7,6 +7,22 @@ extern "C" {
 std::int32_t APS5_VABI scePsmlMfsrGetContextBufferRequirement1100(void* requirement, const void* param);
 std::int32_t APS5_VABI scePsmlMfsrCreateContext1100(void** context, const void* param);
 std::int32_t APS5_VABI scePsmlMfsrGetDispatchMfsrPacket1100(void* context, void* commandBuffer, const void* param);
+int APS5_VABI scePsmlMfsrInit();
+int APS5_VABI scePsmlMfsrReleaseContext(void* context);
+int APS5_VABI scePsmlMfsrGetDispatchMfsrPacketSizeInDwords(void* context, std::uint32_t* dwords_out);
+int APS5_VABI scePsmlMfsrGetSharedResourcesInitRequirement();
+int APS5_VABI scePsmlMfsrCreateSharedResources();
+int APS5_VABI scePsmlMfsrReleaseSharedResources();
+int APS5_VABI scePsmlMfsrGetMipmapBias();
+int APS5_VABI scePsmlMfsr2Init();
+int APS5_VABI scePsmlMfsr2CreateContext();
+int APS5_VABI scePsmlMfsr2ReleaseContext();
+int APS5_VABI scePsmlMfsr2GetContextInitRequirement();
+int APS5_VABI scePsmlMfsr2GetDispatchPackets();
+int APS5_VABI scePsmlMfsr2GetDispatchPacketsSizeInDwords();
+int APS5_VABI scePsmlMfsr2CreateSharedResources();
+int APS5_VABI scePsmlMfsr2GetSharedResourcesInitRequirement();
+int APS5_VABI scePsmlMfsr2ReleaseSharedResources();
 }
 
 namespace {
@@ -50,4 +66,22 @@ int main() {
     Require(scePsmlMfsrGetDispatchMfsrPacket1100(nullptr, &commandBuffer, param.data()) == kErrNotInitialized);
     Require(commandBuffer.cursor == dwords.data());
     Require(dwords == untouchedDwords);
+    Require(scePsmlMfsrInit() == kErrNotInitialized);
+    Require(scePsmlMfsrReleaseContext(&contextStorage) == kErrNotInitialized);
+    std::uint32_t sizeDwords = 9;
+    Require(scePsmlMfsrGetDispatchMfsrPacketSizeInDwords(&contextStorage, &sizeDwords) == kErrNotInitialized);
+    Require(sizeDwords == 9);
+    Require(scePsmlMfsrGetSharedResourcesInitRequirement() == kErrNotInitialized);
+    Require(scePsmlMfsrCreateSharedResources() == kErrNotInitialized);
+    Require(scePsmlMfsrReleaseSharedResources() == kErrNotInitialized);
+    Require(scePsmlMfsrGetMipmapBias() == kErrNotInitialized);
+    Require(scePsmlMfsr2Init() == kErrNotInitialized);
+    Require(scePsmlMfsr2CreateContext() == kErrNotInitialized);
+    Require(scePsmlMfsr2ReleaseContext() == kErrNotInitialized);
+    Require(scePsmlMfsr2GetContextInitRequirement() == kErrNotInitialized);
+    Require(scePsmlMfsr2GetDispatchPackets() == kErrNotInitialized);
+    Require(scePsmlMfsr2GetDispatchPacketsSizeInDwords() == kErrNotInitialized);
+    Require(scePsmlMfsr2CreateSharedResources() == kErrNotInitialized);
+    Require(scePsmlMfsr2GetSharedResourcesInitRequirement() == kErrNotInitialized);
+    Require(scePsmlMfsr2ReleaseSharedResources() == kErrNotInitialized);
 }

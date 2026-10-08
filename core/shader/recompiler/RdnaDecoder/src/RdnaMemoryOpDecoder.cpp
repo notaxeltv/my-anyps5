@@ -322,6 +322,7 @@ constexpr MemoryOpcodeInfo dsOpcodes[] = {
     {0x3cu, RdnaOpcode::DsReadU16, 1, 16, false, false, false},
     {0x3du, RdnaOpcode::DsConsume, 1, 32, false, false, false},
     {0x3eu, RdnaOpcode::DsAppend, 1, 32, false, false, false},
+    {0x3fu, RdnaOpcode::DsOrderedCount, 1, 32, false, false, false},
     {0x4du, RdnaOpcode::DsWriteB64, 2, 32, false, false, false},
     {0x4eu, RdnaOpcode::DsWrite2B64, 4, 32, false, false, false},
     {0x4fu, RdnaOpcode::DsWrite2st64B64, 4, 32, false, false, false},
@@ -330,6 +331,7 @@ constexpr MemoryOpcodeInfo dsOpcodes[] = {
     {0x76u, RdnaOpcode::DsReadB64, 2, 32, false, false, false},
     {0x77u, RdnaOpcode::DsRead2B64, 4, 32, false, false, false},
     {0x78u, RdnaOpcode::DsRead2st64B64, 4, 32, false, false, false},
+    {0x7eu, RdnaOpcode::DsCondxchg32RtnB64, 2, 32, false, false, false},
     {0xa0u, RdnaOpcode::DsWriteB8D16Hi, 1, 8, false, false, false},
     {0xa1u, RdnaOpcode::DsWriteB16D16Hi, 1, 16, false, false, false},
     {0xa2u, RdnaOpcode::DsReadU8D16, 1, 8, false, false, false},
@@ -342,8 +344,6 @@ constexpr MemoryOpcodeInfo dsOpcodes[] = {
     {0xb1u, RdnaOpcode::DsReadAddtidB32, 1, 32, false, false, false},
     {0xb2u, RdnaOpcode::DsPermuteB32, 1, 32, false, false, false},
     {0xb3u, RdnaOpcode::DsBpermuteB32, 1, 32, false, false, false},
-    {0xb4u, RdnaOpcode::DsOrderedCount, 1, 32, false, false, false},
-    {0x7du, RdnaOpcode::DsCondxchg32RtnB64, 2, 32, false, false, false},
     {0xdeu, RdnaOpcode::DsWriteB96, 3, 32, false, false, false},
     {0xdfu, RdnaOpcode::DsWriteB128, 4, 32, false, false, false},
     {0xfeu, RdnaOpcode::DsReadB96, 3, 32, false, false, false},
@@ -476,6 +476,18 @@ bool isDsWriteOpcode(RdnaOpcode opcode) {
     }
 }
 
+bool isDsGwsOpcode(RdnaOpcode opcode) {
+    switch (opcode) {
+        case RdnaOpcode::DsGwsInit:
+        case RdnaOpcode::DsGwsSemaV:
+        case RdnaOpcode::DsGwsSemaBr:
+        case RdnaOpcode::DsGwsSemaP:
+        case RdnaOpcode::DsGwsSemaReleaseAll:
+        case RdnaOpcode::DsGwsBarrier: return true;
+        default: return false;
+    }
+}
+
 bool isDsAtomicOpcode(RdnaOpcode opcode) {
     switch (opcode) {
         case RdnaOpcode::DsAddU32:
@@ -567,18 +579,15 @@ std::uint32_t dsSourceCount(RdnaOpcode opcode) {
         case RdnaOpcode::DsCmpstRtnF64: return 3u;
         case RdnaOpcode::DsMinF32:
         case RdnaOpcode::DsMaxF32: return 2u;
-        case RdnaOpcode::DsNop:
-        case RdnaOpcode::DsGwsSemaReleaseAll:
-        case RdnaOpcode::DsGwsSemaV:
-        case RdnaOpcode::DsGwsSemaBr:
-        case RdnaOpcode::DsGwsSemaP:
-        case RdnaOpcode::DsGwsBarrier: return 0u;
-        case RdnaOpcode::DsGwsInit: return 1u;
+        case RdnaOpcode::DsNop: return 0u;
         case RdnaOpcode::DsPermuteB32:
         case RdnaOpcode::DsBpermuteB32: return 2u;
         case RdnaOpcode::DsReadAddtidB32:
         case RdnaOpcode::DsConsume:
-        case RdnaOpcode::DsAppend: return 0u;
+        case RdnaOpcode::DsAppend:
+        case RdnaOpcode::DsGwsSemaV:
+        case RdnaOpcode::DsGwsSemaP:
+        case RdnaOpcode::DsGwsSemaReleaseAll: return 0u;
         default: return isDsWriteOpcode(opcode) || isDsAtomicOpcode(opcode) ? 2u : 1u;
     }
 }
@@ -933,6 +942,14 @@ RdnaInstruction DecodeRdnaDs(std::uint32_t programCounter, std::span<const std::
     if (info.opcode == RdnaOpcode::DsWriteAddtidB32 && data1 != 0u) {
         throw std::runtime_error("DS write addtid data1 operand is not supported");
     }
+    if (info.opcode == RdnaOpcode::DsCondxchg32RtnB64) {
+        if (data0 + 2u > 256u) {
+            throw std::runtime_error("DS conditional exchange source register range overflow");
+        }
+        if (vdst + 2u > 256u) {
+            throw std::runtime_error("DS conditional exchange destination register range overflow");
+        }
+    }
     if (info.opcode == RdnaOpcode::DsReadAddtidB32 && (data0 != 0u || data1 != 0u)) {
         throw std::runtime_error("DS read addtid data operands are not supported");
     }
@@ -965,6 +982,9 @@ RdnaInstruction DecodeRdnaDs(std::uint32_t programCounter, std::span<const std::
     instruction.source1 = isDsWriteOpcode(instruction.op) ? d16Half(vectorRegister(data0), instruction.op) : vectorRegister(data0);
     instruction.source2 = vectorRegister(data1);
     instruction.sourceCount = dsSourceCount(instruction.op);
+    if (isDsGwsOpcode(instruction.op)) {
+        instruction.destination.kind = RdnaOperandKind::None;
+    }
     return instruction;
 }
 

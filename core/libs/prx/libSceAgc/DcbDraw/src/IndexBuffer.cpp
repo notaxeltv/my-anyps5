@@ -35,23 +35,23 @@ std::uint32_t APS5_VABI sceAgcDcbSetIndexSizeGetSize() {
     return 12;
 }
 
-APS5_EXPORT("-KRzWekV120", sceAgcUnknown__MKRzWekV120);
-std::uint32_t* APS5_VABI sceAgcUnknown__MKRzWekV120(CommandBuffer* buf, std::uint8_t indexSize, std::uint8_t cachePolicy, std::uint8_t perInstanceObjectId) {
+std::uint32_t* APS5_VABI sceAgcDcbSetIndexSize_0600(CommandBuffer* buf, std::uint8_t indexSize, std::uint8_t cachePolicy, std::uint8_t perInstanceObjectId) {
     Agc::Command::CheckBits(perInstanceObjectId, 1, __func__);
     auto* packet = sceAgcDcbSetIndexSize(buf, indexSize, cachePolicy);
     packet[2] |= static_cast<std::uint32_t>(perInstanceObjectId) << 14u;
     return packet;
 }
 
-std::uint32_t* APS5_VABI sceAgcDcbSetIndexIndirectArgs(CommandBuffer* buf, std::uint32_t dataOffsetInBytes) {
-    (void)buf;
-    (void)dataOffsetInBytes;
-    NotImplemented_nid_no_patch(__func__);
-    return nullptr;
+std::uint32_t* APS5_VABI sceAgcDcbSetIndexIndirectArgs(CommandBuffer* buf, std::uint64_t address, std::uint32_t offset) {
+    if (address != 0) Agc::Command::CheckAddress(address, 16, __func__);
+    Agc::Command::CheckBits(offset, 0xffffu, __func__);
+    return Agc::Command::Emit(buf, 0x91u, {static_cast<std::uint32_t>(address) & ~0xfu, static_cast<std::uint32_t>(address >> 32u), offset & 0xffffu}, __func__);
 }
+
 
 std::uint32_t APS5_VABI sceAgcDcbSetIndexIndirectArgsGetSize() {
     return 16;
 }
+
 
 }

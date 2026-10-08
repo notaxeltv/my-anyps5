@@ -25,8 +25,10 @@ std::uint32_t APS5_VABI sceAgcDcbBeginOcclusionQueryGetSize() {
     return 16;
 }
 
+
 std::uint32_t APS5_VABI sceAgcDcbEndOcclusionQueryGetSize() {
     return 16;
 }
+
 
 }

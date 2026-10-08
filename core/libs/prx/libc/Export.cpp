@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstdio>
+#include <stdexcept>
 #include "SceTypes.hpp"
 #include "prx/libc/include/General.hpp"
 #include "prx/libc/include/HeapDiagnostics.hpp"
@@ -19,20 +20,9 @@ extern "C" {
         LibcHeapTraceInfo_nid_no_patch(info);
     }
 
-    int APS5_VABI LibcHeapErrorReportForGame_nid_postfix(
-        uint64_t msp, uint64_t ptr, uint64_t error,
-        uint64_t arg3, uint64_t arg4, uint64_t arg5
-    ) {
-        (void)msp; (void)ptr; (void)error;
-        (void)arg3; (void)arg4; (void)arg5;
-        NotImplemented_nid_no_patch(__func__);
-        return 0;
-    }
-
 // Dead import of Cyberpunk 2077 (PPSA04029): no call sites, but the
 // Windows loader resolves imports strictly, so it must be present.
-APS5_EXPORT("u2tMGOLaqnE", libcUnknown_u2tMGOLaqnE);
-int APS5_VABI libcUnknown_u2tMGOLaqnE() {
+int APS5_VABI _ZSt14_Atomic_assertPKcS0__nid_postfix() {
  NotImplemented_nid_no_patch(__func__);
  return 0;
 }
@@ -45,6 +35,7 @@ int APS5_VABI libcCyberUnknown18(std::FILE* file, long offset, int whence) {
     return std::fseek(file, offset, whence);
 }
 
+
 // Live Cyberpunk 2077 import used as (handle, 0, 0) in the same file-size
 // idiom; returning 0 reports success.
 APS5_EXPORT("tfNbpqL3D0M", libcCyberUnknown19);
@@ -52,6 +43,7 @@ int APS5_VABI libcCyberUnknown19(std::FILE* file, long offset, int whence) {
     if (file == nullptr) throw std::invalid_argument("tfNbpqL3D0M: file is null");
     return std::fseek(file, offset, whence);
 }
+
 
 
 APS5_EXPORT("Ye20uNnlglA", libcCyberUnknown02);

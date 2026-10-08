@@ -60,8 +60,8 @@ int APS5_VABI sceSslTerm_nid_postfix(int ssl_ctx_id) {
     return 0;
 }
 
-int APS5_VABI sceSslClose() {
-    NotImplemented_nid_no_patch(__func__);
+int APS5_VABI sceSslClose(int ssl_ctx_id) {
+    (void)ssl_ctx_id;
     return 0;
 }
 

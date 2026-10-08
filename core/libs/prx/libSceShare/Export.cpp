@@ -113,7 +113,12 @@ int APS5_VABI sceShareCaptureVideoClipExtended(const void* extended_param, int32
     return ERROR_NOT_SUPPORTED;
 }
 
-int APS5_VABI sceShareGetRunningStatus(void) {
+
+int APS5_VABI sceShareGetRunningStatus(uint32_t* status) {
+    if (status == nullptr) {
+        return ERROR_INVALID_PARAM;
+    }
+    *status = 0;
     return 0;
 }
 
@@ -121,5 +126,6 @@ int APS5_VABI sceShareSetContentParamForApplicationTitle(const char* content_par
     (void)content_param;
     return 0;
 }
+
 
 }

@@ -180,8 +180,8 @@ RdnaOpcode decodeSopkOpcode(std::uint32_t opcode) {
         case 0x10u: return RdnaOpcode::SMulkI32;
         case 0x12u: return RdnaOpcode::SGetregB32;
         case 0x13u: return RdnaOpcode::SSetregB32;
-        case 0x14u: return RdnaOpcode::SCallB64;
         case 0x15u: return RdnaOpcode::SSetregImm32B32;
+        case 0x16u: return RdnaOpcode::SCallB64;
         case 0x17u: return RdnaOpcode::SWaitcnt;
         case 0x18u: return RdnaOpcode::SWaitcnt;
         case 0x19u: return RdnaOpcode::SWaitcnt;
@@ -223,7 +223,7 @@ RdnaOpcode decodeSoppOpcode(std::uint32_t opcode) {
         case 0x1au: return RdnaOpcode::SCbranchCdbg;
         case 0x1bu:
         case 0x1eu: return RdnaOpcode::SEndpgm;
-        case 0x1du: return RdnaOpcode::SCodeEnd;
+        case 0x1fu: return RdnaOpcode::SCodeEnd;
         case 0x20u: return RdnaOpcode::SInstPrefetch;
         case 0x21u: return RdnaOpcode::SClause;
         case 0x22u: return RdnaOpcode::SWaitIdle;
@@ -248,8 +248,8 @@ bool isSoppWaitOpcode(RdnaOpcode opcode) {
         opcode == RdnaOpcode::STrap || opcode == RdnaOpcode::STtracedata || opcode == RdnaOpcode::SInstPrefetch ||
         opcode == RdnaOpcode::SClause || opcode == RdnaOpcode::SCbranchCdbg || opcode == RdnaOpcode::SIcacheInv ||
         opcode == RdnaOpcode::SIncperflevel || opcode == RdnaOpcode::SDecperflevel || opcode == RdnaOpcode::SWaitIdle ||
-        opcode == RdnaOpcode::SRoundMode || opcode == RdnaOpcode::SDenormMode ||
-        opcode == RdnaOpcode::SSethalt || opcode == RdnaOpcode::SSendmsghalt;
+        opcode == RdnaOpcode::SRoundMode || opcode == RdnaOpcode::SDenormMode || opcode == RdnaOpcode::SSethalt ||
+        opcode == RdnaOpcode::SSendmsghalt;
 }
 
 std::uint32_t scalarDestinationDwordCount(RdnaOpcode opcode) {
@@ -264,8 +264,6 @@ std::uint32_t scalarDestinationDwordCount(RdnaOpcode opcode) {
         case RdnaOpcode::SBitset1B64:
         case RdnaOpcode::SGetpcB64:
         case RdnaOpcode::SSwappcB64:
-        case RdnaOpcode::SRfeB64:
-        case RdnaOpcode::SCallB64:
         case RdnaOpcode::SAndSaveexecB64:
         case RdnaOpcode::SOrSaveexecB64:
         case RdnaOpcode::SXorSaveexecB64:
@@ -295,6 +293,7 @@ std::uint32_t scalarDestinationDwordCount(RdnaOpcode opcode) {
         case RdnaOpcode::SLshlB64:
         case RdnaOpcode::SLshrB64:
         case RdnaOpcode::SBfmB64:
+        case RdnaOpcode::SCallB64:
         case RdnaOpcode::SBfeU64: return 2u;
         default: return 1u;
     }
@@ -353,13 +352,6 @@ RdnaInstruction DecodeRdnaSop1(std::uint32_t programCounter, std::span<const std
     if (instruction.op == RdnaOpcode::SSetpcB64 || instruction.op == RdnaOpcode::SRfeB64) {
         instruction.sourceCount = 1;
         instruction.destination.kind = RdnaOperandKind::Null;
-        instruction.source0 = DecodeRdnaScalarSource(scalarSource0, programCounter);
-        ReadRdnaLiteralOperands(code, wordIndex, instruction);
-        return instruction;
-    }
-    if (instruction.op == RdnaOpcode::SSwappcB64) {
-        instruction.sourceCount = 1;
-        instruction.destination = DecodeRdnaScalarDestination(scalarDestination, programCounter);
         instruction.source0 = DecodeRdnaScalarSource(scalarSource0, programCounter);
         ReadRdnaLiteralOperands(code, wordIndex, instruction);
         return instruction;
@@ -428,9 +420,9 @@ RdnaInstruction DecodeRdnaSopk(std::uint32_t programCounter, std::span<const std
         instruction.destination = DecodeRdnaScalarDestination(scalarRegister, programCounter);
         return instruction;
     }
-    if (instruction.op == RdnaOpcode::SSubvectorLoopBegin || instruction.op == RdnaOpcode::SSubvectorLoopEnd ||
-        instruction.op == RdnaOpcode::SCallB64) {
+    if (instruction.op == RdnaOpcode::SSubvectorLoopBegin || instruction.op == RdnaOpcode::SSubvectorLoopEnd || instruction.op == RdnaOpcode::SCallB64) {
         instruction.destination = DecodeRdnaScalarDestination(scalarRegister, programCounter);
+        instruction.dataDwordCount = scalarDestinationDwordCount(instruction.op);
         instruction.branchTarget = programCounter + 4u + static_cast<std::uint32_t>(immediate * 4);
         return instruction;
     }

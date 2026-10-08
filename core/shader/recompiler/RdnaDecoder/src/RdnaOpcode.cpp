@@ -908,7 +908,7 @@ bool IsConditionalBranchOpcode(RdnaOpcode opcode) {
 
 bool IsDirectBranchOpcode(RdnaOpcode opcode) {
     requireClassifiableOpcode(opcode);
-    if (opcode == RdnaOpcode::SBranch || opcode == RdnaOpcode::SCallB64) {
+    if (opcode == RdnaOpcode::SBranch) {
         return true;
     }
     return IsConditionalBranchOpcode(opcode);
