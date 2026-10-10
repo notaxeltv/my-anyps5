@@ -169,6 +169,19 @@ DecodedImage decodeImageDescriptor(const DescriptorValue& descriptor, const Imag
         }
         decoded.packedFormat = format;
     }
+    if (base.byElements != 0u) {
+        const bool eightBit = format == IrBufferFormat::Format8UNorm || format == IrBufferFormat::Format8SNorm || format == IrBufferFormat::Format8UInt || format == IrBufferFormat::Format8SInt;
+        const bool sixteenBit = format == IrBufferFormat::Format16UNorm || format == IrBufferFormat::Format16SNorm || format == IrBufferFormat::Format16UInt || format == IrBufferFormat::Format16SInt || format == IrBufferFormat::Format16Float;
+        const bool eightBitPair = format == IrBufferFormat::Format8_8UNorm || format == IrBufferFormat::Format8_8SNorm || format == IrBufferFormat::Format8_8UInt || format == IrBufferFormat::Format8_8SInt;
+        const bool packedEight = format == IrBufferFormat::Format8UNorm || format == IrBufferFormat::Format8UInt || format == IrBufferFormat::Format8SInt;
+        const bool packedSixteen = format == IrBufferFormat::Format16UNorm || format == IrBufferFormat::Format16UInt || format == IrBufferFormat::Format16SInt || format == IrBufferFormat::Format8_8UNorm || format == IrBufferFormat::Format8_8UInt || format == IrBufferFormat::Format8_8SInt;
+        const bool measured = base.packed ? packedEight || (base.byElements == 2u && packedSixteen)
+                                          : base.byElements == 4u ? base.byComponents == 1u && eightBit : base.byElements == 2u && (base.byComponents == 1u ? eightBit || sixteenBit : base.byComponents == 2u && eightBitPair);
+        if (!measured || descriptorImageSwizzle(descriptor) != ShaderImageIdentitySwizzle || rawImageType(descriptor) != ImageType::Color2D || base.indirectRoot != ImageResource::NoIndirectImage) {
+            throw std::runtime_error(base.packed ? "MIMG PCK2/PCK4 requires a direct, identity-swizzled 2D UNORM, UINT or SINT image whose elements fill one dword: R8, R16 or RG8 for PCK2, R8 for PCK4"
+                                                 : "MIMG BY2/BY4 requires a direct, identity-swizzled 2D image whose elements fill one dword: R8, R16 or RG8 for BY2, R8 for BY4");
+        }
+    }
     decoded.conversionFormat = RemapTextureFormat(format) != format ? format : IrBufferFormat::Invalid;
     if (format == IrBufferFormat::Format11_11_10UNorm || format == IrBufferFormat::Format10_11_11Float) {
         const bool floating = format == IrBufferFormat::Format10_11_11Float;
@@ -311,8 +324,8 @@ void resolveTableImage(const IrResourcePlan& plan, std::uint32_t imageIndex, con
     if (image.resourceClass != ImageResourceClass::Sampled) {
         rejectTable(BindlessRejection::Storage, "bindless storage image tables are unsupported");
     }
-    if (image.packed) {
-        throw std::runtime_error("bindless packed image tables are unsupported");
+    if (image.packed || image.byElements != 0u) {
+        throw std::runtime_error("bindless packed and BY2/BY4 image tables are unsupported");
     }
     const auto slots = ResourceMaterializer::BindlessSlots();
     DescriptorValue heapValue;
@@ -431,7 +444,7 @@ void materializeSnapshot(const IrResourcePlan& plan, const SrtRuntime& runtime, 
 
     std::vector<DescriptorValue> values;
     std::vector<std::uint8_t> activeSources;
-    walker.EvaluateRuntimeSources(plan, plan.materializationSources, runtime, values, snapshot.flattenedSrt, plan.cleanFlatSlots, activeSources);
+    walker.EvaluateRuntimeSources(plan, plan.materializationSources, runtime, values, snapshot.flattenedSrt, plan.cleanFlatSlots, activeSources, &snapshot.srtPoison);
 
     std::size_t cursor = 0;
     if (values.size() < plan.info.buffers.size()) {
@@ -514,7 +527,7 @@ std::uint32_t emulatedCompareState(const ShaderInfo& info, const ResourceSnapsho
     if ((image.emulatedCompare & EmulatedCompare::RequiresSingleLevel) != 0u && ((descriptor.dwords[3] >> 12u) & 0xfu) != ((descriptor.dwords[3] >> 16u) & 0xfu)) throw std::runtime_error("color comparison requires a single mip level");
     const auto reference = colorCompareReference(format);
     const auto type = rawImageType(descriptor);
-    if (type != ImageType::Color2D && type != ImageType::Color2DArray) throw std::runtime_error("comparison sampling of a color texture is implemented only for 2D and 2D array views");
+    if (type != ImageType::Color2D && type != ImageType::Color2DArray && type != ImageType::Cube) throw std::runtime_error("comparison sampling of a color texture is implemented only for 2D, 2D array and cube views");
     if ((descriptorImageSwizzle(descriptor) & 0x7u) != 4u) throw std::runtime_error("comparison sampling of a color texture is implemented only when the view's X channel is red");
     std::optional<std::uint32_t> samplerState;
     for (const auto& pair : info.sampledPairs) {
@@ -528,6 +541,9 @@ std::uint32_t emulatedCompareState(const ShaderInfo& info, const ResourceSnapsho
         if (((words[0] >> 29u) & 0x3u) != 0u) throw std::runtime_error("comparison sampling of a color texture through a min or max reduction sampler is not implemented");
         const auto magFilter = (words[2] >> 20u) & 0x3u;
         const auto minFilter = (words[2] >> 22u) & 0x3u;
+        if (type == ImageType::Cube && magFilter == 1u && ((words[0] >> 28u) & 1u) == 0u) {
+            throw std::runtime_error("bilinear cube comparison requires DISABLE_CUBE_WRAP to avoid seamless face filtering");
+        }
         const auto addressMode = [](std::uint32_t clamp) {
             if (clamp == 0u) return EmulatedCompare::AddressWrap;
             if (clamp == 2u) return EmulatedCompare::AddressEdge;
@@ -580,6 +596,19 @@ void materializeTables(const IrResourcePlan& plan, ResourceSnapshot& snapshot, c
     }
 }
 
+void materializeSrtGuards(const IrResourcePlan& plan, ResourceSnapshot& snapshot) {
+    const auto& guarded = plan.guardedSrtSlots;
+    const auto flags = snapshot.flattenedSrt.size();
+    snapshot.flattenedSrt.resize(flags + guarded.size(), 0u);
+    for (std::uint32_t record = 0u; record < snapshot.srtPoison.size(); ++record) {
+        const auto& poison = snapshot.srtPoison[record];
+        const auto found = std::lower_bound(guarded.begin(), guarded.end(), poison.slot);
+        if (found == guarded.end() || *found != poison.slot) throw std::runtime_error("SRT read at flat offset " + std::to_string(poison.slot) + " reads inaccessible memory but has no guard");
+        snapshot.flattenedSrt[flags + static_cast<std::size_t>(found - guarded.begin())] = record + 1u;
+        snapshot.flattenedSrt.insert(snapshot.flattenedSrt.end(), {poison.pc, static_cast<std::uint32_t>(poison.address), static_cast<std::uint32_t>(poison.address >> 32u)});
+    }
+}
+
 }
 
 std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageResource& image) {
@@ -593,14 +622,29 @@ std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageRe
         mode.depthBits = depth;
         mode.depthUnorm16 = unorm16;
         mode.cube = false;
-        mode.mipCount = mode.mipMode == ImageMipMode::DynamicStorage ? RuntimeAbi::StorageHeapCapacity : 1u;
+        mode.mipCount = mode.mipMode == ImageMipMode::DynamicStorage ? RuntimeAbi::StorageMipSlots : 1u;
         mode.shaderSwizzle = ShaderImageIdentitySwizzle;
         if (conversion == IrBufferFormat::Format11_11_10UNorm || conversion == IrBufferFormat::Format10_11_11Float) mode.shaderSwizzle = 0x2acu;
         modes.push_back(mode);
-        if (image.dimension == RdnaImageDimension::Dim2D && image.fmaskCompatible && !depth && packed == IrBufferFormat::Invalid) {
+        if (image.dimension == RdnaImageDimension::Dim2D && image.fmaskCompatible && !depth && packed == IrBufferFormat::Invalid && image.byElements == 0u) {
             auto volume = mode;
             volume.dimension = RdnaImageDimension::Dim3D;
             modes.push_back(volume);
+        }
+        if (image.dimension == RdnaImageDimension::Dim3D && image.flatVolumeCompatible && !storage && !depth && conversion == IrBufferFormat::Invalid && packed == IrBufferFormat::Invalid) {
+            auto plane = mode;
+            plane.dimension = RdnaImageDimension::Dim2D;
+            modes.push_back(plane);
+        }
+        if (image.dimension == RdnaImageDimension::Dim2D && storage && image.written && !image.read && !image.atomic && image.mipMode != ImageMipMode::DynamicStorage && !depth && packed == IrBufferFormat::Invalid && image.byElements == 0u) {
+            auto line = mode;
+            line.dimension = RdnaImageDimension::Dim1D;
+            modes.push_back(line);
+        }
+        if (image.dimension == RdnaImageDimension::Dim2D && image.flatLineCompatible && !storage && !depth && conversion == IrBufferFormat::Invalid && packed == IrBufferFormat::Invalid) {
+            auto line = mode;
+            line.dimension = RdnaImageDimension::Dim1D;
+            modes.push_back(line);
         }
         if (image.dimension == RdnaImageDimension::Dim1DArray || image.dimension == RdnaImageDimension::Dim2DArray || image.dimension == RdnaImageDimension::Dim2DMsaaArray) {
             auto plain = mode;
@@ -619,6 +663,7 @@ std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageRe
             const auto format = static_cast<IrBufferFormat>(value);
             const auto info = GetFormatInfo(format);
             if (info.packedBitfield || info.componentCount == 0u || (storage && info.byteSize == 12u)) continue;
+            if (image.byElements != 0u && info.byteSize * 8u * image.byElements > 32u) continue;
             const auto numeric = storage && (format == IrBufferFormat::Format32SInt || format == IrBufferFormat::Format32_32SInt || format == IrBufferFormat::Format32_32_32_32SInt) ? IrTextureNumericClass::Uint : SampledTextureNumericClass(format);
             bool supported = numeric != IrTextureNumericClass::Unsupported && (!storage || numeric != IrTextureNumericClass::Sint);
             for (std::uint32_t component = 0u; component < info.componentCount; ++component) {
@@ -665,6 +710,10 @@ std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageRe
         mode.packedFormat = IrBufferFormat::Invalid;
         mode.shaderSwizzle = ShaderImageIdentitySwizzle;
         modes.push_back(mode);
+        if (image.dimension == RdnaImageDimension::Dim2DArray) {
+            mode.cube = true;
+            modes.push_back(mode);
+        }
     }
     if (image.srgbDecodeFormats != 0u && image.srgbDecodeCompatible && !storage && !image.depthCompare && !image.packed) {
         const auto count = modes.size();
@@ -673,6 +722,21 @@ std::vector<ImageResource> ResourceMaterializer::RuntimeImageModes(const ImageRe
             if (base.numericClass != IrTextureNumericClass::Float || base.conversionFormat != IrBufferFormat::Invalid || base.packedFormat != IrBufferFormat::Invalid || base.depthBits) continue;
             auto mode = base;
             mode.srgbDecode = true;
+            modes.push_back(mode);
+        }
+    }
+    if (image.constantSwizzleCompatible && !storage && !image.depthCompare && !image.packed && image.indirectRoot == ImageResource::NoIndirectImage) {
+        for (const auto numeric : {IrTextureNumericClass::Float, IrTextureNumericClass::Uint, IrTextureNumericClass::Sint}) {
+            auto mode = image;
+            mode.numericClass = numeric;
+            mode.conversionFormat = IrBufferFormat::Invalid;
+            mode.packedFormat = IrBufferFormat::Invalid;
+            mode.depthBits = false;
+            mode.depthUnorm16 = false;
+            mode.cube = false;
+            mode.mipCount = 1u;
+            mode.shaderSwizzle = ShaderImageIdentitySwizzle;
+            mode.constantSwizzle = true;
             modes.push_back(mode);
         }
     }
@@ -699,7 +763,12 @@ std::uint32_t ResourceMaterializer::RuntimeImageMode(const ImageResource& image,
             if (!exact) throw std::runtime_error(storage ? "runtime packed image bits are not reproducible through the view" : "runtime packed image bits are not recoverable from the view");
         }
     }
-    if (decoded.mipCount > (image.mipMode == ImageMipMode::DynamicStorage ? RuntimeAbi::StorageHeapCapacity : 1u)) throw std::runtime_error("runtime storage image mip capacity exceeded");
+    if (decoded.mipCount > (image.mipMode == ImageMipMode::DynamicStorage ? RuntimeAbi::StorageMipSlots : 1u)) throw std::runtime_error("runtime storage image mip capacity exceeded");
+    if ((descriptorImageSwizzle(descriptor) & 06666u) == 0u && !decoded.fmask && !decoded.depthBits && decoded.conversionFormat == IrBufferFormat::Invalid && !decoded.srgbDecode) {
+        for (std::uint32_t index = 0u; index < modes.size(); ++index) {
+            if (modes[index].constantSwizzle && modes[index].numericClass == decoded.numericClass) return index;
+        }
+    }
     for (std::uint32_t index = 0u; index < modes.size(); ++index) {
         const auto& mode = modes[index];
         if (((mode.emulatedCompare & EmulatedCompare::Enabled) != 0u) != emulated) continue;
@@ -743,7 +812,7 @@ void ResourceMaterializer::ApplyStaticInterface(IrProgram& program, bool nativeS
         image.srgbDecodeFormats = resources.srgbDecodeFormats;
         if (image.indirectRoot != ImageResource::NoIndirectImage) throw std::runtime_error("static image interface was already expanded");
         image.numericClass = image.atomic ? IrTextureNumericClass::Uint : IrTextureNumericClass::Float;
-        image.mipCount = image.mipMode == ImageMipMode::DynamicStorage ? RuntimeAbi::StorageHeapCapacity : 1u;
+        image.mipCount = image.mipMode == ImageMipMode::DynamicStorage ? RuntimeAbi::StorageMipSlots : 1u;
         if (resources.descriptorSources.at(image.source).indirectImage.has_value()) {
             if (images.size() + slots - 1u > ShaderInfo::MaxImages) throw std::runtime_error("static bindless image capacity exceeded");
             image.indirectRoot = index;
@@ -766,6 +835,9 @@ void ResourceMaterializer::ApplyStaticInterface(IrProgram& program, bool nativeS
         sampler.depthCompare = sampler.depthCompare || images[pair.image].depthCompare;
     }
     resources.info.images = std::move(images);
+    resources.guardedSrtSlots = Detail::ComputeGuardedFlatSlots(resources);
+    resources.srtGuardOffset = mappingOffset;
+    if (!resources.guardedSrtSlots.empty()) resources.info.usesFaultBuffer = true;
     PrepareImageModes(resources.info);
 }
 
@@ -879,6 +951,7 @@ IrResourcePlan ResourceMaterializer::ExtractPlan(const IrProgram& program) const
     }
     for (const auto& sampler : plan.info.samplers) addSource(sampler.source);
     plan.pureFlatSlots = Detail::ComputePureFlatSlots(plan);
+    plan.guardedSrtSlots = Detail::ComputeGuardedFlatSlots(plan);
     return plan;
 }
 
@@ -901,6 +974,7 @@ void ResourceMaterializer::Materialize(const IrResourcePlan& program, const SrtR
     }
     const auto started = MaterializeProfiled() ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     materializeTables(plan, nextSnapshot, tables);
+    materializeSrtGuards(plan, nextSnapshot);
     if (MaterializeProfiled()) specializationNanoseconds.fetch_add(static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - started).count()), std::memory_order_relaxed);
     snapshot = std::move(nextSnapshot);
     reportBindless();
@@ -911,7 +985,7 @@ std::uint64_t ResourceMaterializer::SpecializationNanoseconds() {
 }
 
 std::uint32_t ResourceMaterializer::BindlessSlots() {
-    return RuntimeAbi::SampledHeapCapacity;
+    return RuntimeAbi::BindlessTableSlots;
 }
 
 void ResourceMaterializer::CountBindlessRejection(BindlessRejection reason) {

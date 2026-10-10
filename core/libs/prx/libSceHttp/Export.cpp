@@ -4,9 +4,11 @@
 #include "prx/libc/include/General.hpp"
 #include "prx/libSceHttp/src/HttpErrors.hpp"
 #include <atomic>
+#include <chrono>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
+#include <thread>
 
 // No network is emulated: contexts, templates and requests can be created, but any request
 // that would touch the network fails with the library's network error.
@@ -141,6 +143,13 @@ int APS5_VABI sceHttpSetAuthEnabled(int id, int enable) {
     return 0;
 }
 
+int APS5_VABI sceHttpSetAuthInfoCallback(int id, HttpAuthInfoCallback callback, void* userArg) {
+    (void)id;
+    (void)callback;
+    (void)userArg;
+    return 0;
+}
+
 int APS5_VABI sceHttpSetCookieEnabled(int id, int enable) {
     (void)id;
     if (static_cast<uint32_t>(enable) > 1) return ERROR_INVALID_VALUE;
@@ -239,6 +248,7 @@ int APS5_VABI sceHttpWaitRequest(HttpEpollHandle eh, HttpNBEvent* nbev, int maxe
     (void)timeout;
     return ERROR_NETWORK;
 }
+
 
 int APS5_VABI sceHttpCreateRequestWithURL(int conn_id, int method, const char* url, uint64_t content_length) {
     (void)conn_id;
@@ -406,5 +416,4 @@ int APS5_VABI sceHttpSetRedirectCallback(int id, HttpRedirectCallback cbfunc, vo
     (void)user_arg;
     return 0;
 }
-
 }

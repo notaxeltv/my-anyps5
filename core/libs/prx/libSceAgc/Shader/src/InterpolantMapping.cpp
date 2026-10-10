@@ -120,4 +120,8 @@ int APS5_VABI sceAgcUnknownCreateInterpolantMapping(ShaderRegister* regs, const 
     return CreateInterpolantMapping(__func__, regs, gs, ps, CreateInterpolantValueSplitF16);
 }
 
+int APS5_VABI sceAgcCreateInterpolantMapping_0100(ShaderRegister* regs, const Shader* gs, const Shader* ps) {
+    return CreateInterpolantMapping(__func__, regs, gs, ps, CreateInterpolantValue);
+}
+
 }

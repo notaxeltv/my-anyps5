@@ -23,6 +23,7 @@ int APS5_VABI sceKernelGetEventError(const KernelEvent* ev) {
     return 0;
 }
 
+
 intptr_t APS5_VABI sceKernelGetEventFflags(const KernelEvent* ev) {
     return static_cast<intptr_t>(requireEvent(ev, __func__).fflags);
 }
