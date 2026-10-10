@@ -10,6 +10,7 @@ add_executable(nid_patcher
         ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/ExportExclusions.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/ElfNidPatcher.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/PeNidPatcher.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/MachONidPatcher.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/BinaryPatcherFactory.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/main.cpp
 )
@@ -131,6 +132,20 @@ endforeach()
 add_custom_target(libs DEPENDS ${PATCHED_OUTPUTS})
 
 if(BUILD_TESTING)
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME nid_patcher_macho COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/nid/tests/test_macho_nids.py $<TARGET_FILE:nid_patcher>)
+    endif()
+    add_test_executable(guest_kernel_sys_tests tests/GuestKernelSys.cpp)
+    target_include_directories(guest_kernel_sys_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(guest_kernel_sys_tests PRIVATE libkernel_sys libkernel libc)
+    configure_windows_unwind(guest_kernel_sys_tests)
+    add_test(NAME guest_kernel_sys COMMAND guest_kernel_sys_tests)
+    if(WIN32)
+        set_tests_properties(guest_kernel_sys PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libkernel_sys>")
+    endif()
     add_test_executable(guest_offline_imports_tests tests/GuestOfflineImports.cpp)
     target_include_directories(guest_offline_imports_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(guest_offline_imports_tests PRIVATE libSceHttp libSceNpAuth libSceNpEntitlementAccess libSceRudp libc)

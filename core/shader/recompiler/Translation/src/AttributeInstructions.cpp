@@ -52,56 +52,16 @@ ExportFlags TranslationContext::addExportInfo(const RdnaInstruction& inst) {
     return ExportFlags{index, inst.programCounter};
 }
 
-IrValue& TranslationContext::barycentricP1(const RdnaInstruction& inst, std::uint32_t attr, std::uint32_t chan) {
-    auto& delta = ir.Emit(IrOpcode::GetInterpolationParameter, IrType::U32, {&ir.Constant(attr), &ir.Constant(chan), &ir.Constant(0u)});
-    auto& origin = ir.Emit(IrOpcode::GetInterpolationParameter, IrType::U32, {&ir.Constant(attr), &ir.Constant(chan), &ir.Constant(2u)});
-    auto& product = ir.Emit(IrOpcode::FPMul32, IrType::F32, {&ir.BitCastF32(delta), readOperand(inst.source0, IrType::F32)});
-    return ir.Emit(IrOpcode::FPAdd32, IrType::F32, {&product, &ir.BitCastF32(origin)});
-}
-
-IrU32 TranslationContext::packF16FromF32(IrValue& value) {
-    const IrF16 half(ir.Emit(IrOpcode::ConvertF16F32, IrType::F16, {&value}));
-    const IrU16 bits(ir.Emit(IrOpcode::BitCastU16F16, IrType::U16, {&half.Value()}));
-    return IrU32(ir.Emit(IrOpcode::ConvertU32U16, IrType::U32, {&bits.Value()}));
-}
-
 void TranslationContext::vInterpP1F32(const RdnaInstruction& inst) {
-    if (!fragmentShaderBarycentricEnabled) return;
-    writeOperand(inst.destination, &barycentricP1(inst, inst.source1.value, inst.source2.value));
-}
-
-void TranslationContext::vInterpP1llF16(const RdnaInstruction& inst) {
-    if (!fragmentShaderBarycentricEnabled) return;
-    const std::uint32_t attr = inst.source1.value;
-    const std::uint32_t chan = inst.source2.value & ~1u;
-    const IrU32 low = packF16FromF32(barycentricP1(inst, attr, chan));
-    const IrU32 high = packF16FromF32(barycentricP1(inst, attr, chan | 1u));
-    const IrU32 packed(ir.BitwiseOr(low.Value(), ir.ShiftLeftLogical(high.Value(), ir.Constant(16u))));
-    writeOperand(inst.destination, &packed.Value());
-}
-
-void TranslationContext::vInterpP1lvF16(const RdnaInstruction& inst) {
-    if (!fragmentShaderBarycentricEnabled) return;
-    const IrU32 previous = readU32(sourceAt(inst, 3u));
-    const IrU32 low(ir.BitwiseAnd(previous.Value(), ir.Constant(0xffffu)));
-    const IrU32 high = packF16FromF32(barycentricP1(inst, inst.source1.value, inst.source2.value | 1u));
-    const IrU32 packed(ir.BitwiseOr(low.Value(), ir.ShiftLeftLogical(high.Value(), ir.Constant(16u))));
-    writeOperand(inst.destination, &packed.Value());
-}
-
-void TranslationContext::vInterpP2F16(const RdnaInstruction& inst) {
-    if (fragmentShaderBarycentricEnabled) {
-        const RdnaOperand accumulator = inst.sourceCount >= 4u ? sourceAt(inst, 3u) : inst.destination;
-        auto& delta = ir.Emit(IrOpcode::GetInterpolationParameter, IrType::U32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value), &ir.Constant(1u)});
-        auto& product = ir.Emit(IrOpcode::FPMul32, IrType::F32, {&ir.BitCastF32(delta), readOperand(inst.source0, IrType::F32)});
-        auto& result = ir.Emit(IrOpcode::FPAdd32, IrType::F32, {&product, readOperand(accumulator, IrType::F32)});
-        const IrU32 packed = packF16FromF32(result);
-        writeOperand(inst.destination, &packed.Value());
+    if (!fragmentShaderBarycentricEnabled) {
+        writeOperand(inst.destination, &ir.Emit(IrOpcode::InterpolateHostP1, IrType::F32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value), readOperand(inst.source0, IrType::F32)}));
         return;
     }
-    IrValue& value = ir.Emit(IrOpcode::GetAttribute, IrType::U32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value)});
-    const IrU32 packed = packF16FromF32(ir.BitCastF32(value));
-    writeOperand(inst.destination, &packed.Value());
+    auto& delta = ir.Emit(IrOpcode::GetInterpolationParameter, IrType::U32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value), &ir.Constant(0u)});
+    auto& origin = ir.Emit(IrOpcode::GetInterpolationParameter, IrType::U32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value), &ir.Constant(2u)});
+    auto& product = ir.Emit(IrOpcode::FPMul32, IrType::F32, {&ir.BitCastF32(delta), readOperand(inst.source0, IrType::F32)});
+    auto& result = ir.Emit(IrOpcode::FPAdd32, IrType::F32, {&product, &ir.BitCastF32(origin)});
+    writeOperand(inst.destination, &result);
 }
 
 void TranslationContext::vInterpP2F32(const RdnaInstruction& inst) {
@@ -124,6 +84,7 @@ void TranslationContext::vInterpP2F32(const RdnaInstruction& inst) {
             program.Metadata().pixelPerspectiveInputs |= bit;
         }
     }
+    ir.Emit(IrOpcode::InterpolateHostP2, IrType::Void, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value), readOperand(inst.source0, IrType::F32), readOperand(inst.destination, IrType::F32), &ir.GetExec()});
     IrValue& value = ir.Emit(IrOpcode::GetAttribute, IrType::U32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value)});
     writeOperand(inst.destination, &value);
 }
@@ -134,6 +95,42 @@ void TranslationContext::vInterpMovF32(const RdnaInstruction& inst) {
     }
     IrValue& value = ir.Emit(IrOpcode::GetInterpolationParameter, IrType::U32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value), &ir.Constant(inst.source0.value)});
     writeOperand(inst.destination, &value);
+}
+
+IrF32 TranslationContext::interpolationParameterF16(const RdnaInstruction& inst, std::uint32_t mode) {
+    if (!fragmentShaderBarycentricEnabled) {
+        throw std::runtime_error("16-bit interpolation of pixel input " + std::to_string(inst.source1.value) + " requires fragmentShaderBarycentric");
+    }
+    if (pixelInput == nullptr || !pixelInput->InputIsFp16(inst.source1.value)) {
+        throw std::runtime_error("pixel input " + std::to_string(inst.source1.value) + " is read with 16-bit interpolation without FP16_INTERP_MODE");
+    }
+    return IrF32(ir.Emit(IrOpcode::GetInterpolationParameterF16, IrType::F32, {&ir.Constant(inst.source1.value), &ir.Constant(inst.source2.value), &ir.Constant(mode), &ir.Constant(inst.source1.opSel ? 1u : 0u)}));
+}
+
+std::uint32_t TranslationContext::interpolationModeF16(const RdnaInstruction& inst) const {
+    if (!floatMode.has_value()) return 0u;
+    const auto mode = floatMode->floatMode;
+    const auto denorm32 = (mode >> 4u) & 3u;
+    const auto denorm16 = (mode >> 6u) & 3u;
+    if ((mode & 0xfu) != 0u || (denorm32 != 0u && denorm32 != 3u) || (denorm16 != 0u && denorm16 != 3u)) {
+        throw std::runtime_error("16-bit interpolation at pc " + std::to_string(inst.programCounter) + " in FLOAT_MODE " + std::to_string(mode) + " is not measured");
+    }
+    return (floatMode->ieeeMode ? InterpolationQuiet : 0u) | (denorm32 == 0u ? InterpolationFlush32 : 0u) | (denorm16 == 0u ? InterpolationFlush16 : 0u);
+}
+
+void TranslationContext::vInterpP1F16(const RdnaInstruction& inst) {
+    const auto mode = interpolationModeF16(inst);
+    const IrF32 delta = interpolationParameterF16(inst, 0u);
+    const IrF32 origin = inst.op == RdnaOpcode::VInterpP1lvF16 ? readF16AsF32(inst.source3) : interpolationParameterF16(inst, 2u);
+    writeOperand(inst.destination, &ir.Emit(IrOpcode::FPInterpolateF32, IrType::F32, {&delta.Value(), readOperand(inst.source0, IrType::F32), &origin.Value(), &ir.Constant(mode)}));
+}
+
+void TranslationContext::vInterpP2F16(const RdnaInstruction& inst) {
+    const auto mode = interpolationModeF16(inst);
+    const IrF32 delta = interpolationParameterF16(inst, 1u);
+    IrValue* coordinate = readOperand(inst.source0, IrType::F32);
+    IrValue* partial = readOperand(inst.source3, IrType::F32);
+    writeF16(inst.destination, IrF32(ir.Emit(IrOpcode::FPInterpolateF16, IrType::F32, {&delta.Value(), coordinate, partial, &ir.Constant(mode)})), {&delta.Value(), coordinate, partial});
 }
 
 void TranslationContext::eXP(const RdnaInstruction& inst) {
@@ -152,7 +149,8 @@ void TranslationContext::eXP(const RdnaInstruction& inst) {
 }
 
 bool TranslationContext::emitInterpolation(const RdnaInstruction& inst) {
-    if ((inst.op == RdnaOpcode::VInterpP1F32 || inst.op == RdnaOpcode::VInterpP2F32 || inst.op == RdnaOpcode::VInterpP1llF16 || inst.op == RdnaOpcode::VInterpP1lvF16 || inst.op == RdnaOpcode::VInterpP2F16) && pixelInput != nullptr && pixelInput->InputIsCustom(inst.source1.value)) {
+    const bool interpolates = inst.op == RdnaOpcode::VInterpP1F32 || inst.op == RdnaOpcode::VInterpP2F32 || inst.op == RdnaOpcode::VInterpP1llF16 || inst.op == RdnaOpcode::VInterpP1lvF16 || inst.op == RdnaOpcode::VInterpP2F16;
+    if (interpolates && pixelInput != nullptr && pixelInput->InputIsCustom(inst.source1.value)) {
         throw std::runtime_error("pixel input " + std::to_string(inst.source1.value) + " passes its vertices through unchanged but is read with v_interp_p1/p2");
     }
     switch (inst.op) {
@@ -166,10 +164,8 @@ bool TranslationContext::emitInterpolation(const RdnaInstruction& inst) {
             vInterpMovF32(inst);
             return true;
         case RdnaOpcode::VInterpP1llF16:
-            vInterpP1llF16(inst);
-            return true;
         case RdnaOpcode::VInterpP1lvF16:
-            vInterpP1lvF16(inst);
+            vInterpP1F16(inst);
             return true;
         case RdnaOpcode::VInterpP2F16:
             vInterpP2F16(inst);

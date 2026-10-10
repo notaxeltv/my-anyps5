@@ -1,9 +1,9 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #include "prx/libc/include/General.hpp"
 #include "prx/libSceNgs2.native/include/Ngs2Types.hpp"
-#include <cstring>
 
 #pragma GCC visibility push(default)
 
@@ -39,25 +39,6 @@ int APS5_VABI sceNgs2GeomResetSourceParam(Ngs2GeomSourceParam* out_source_param)
     return SCE_NGS2_OK;
 }
 
-
-int APS5_VABI sceNgs2PanGetVolumeMatrix(Ngs2PanWork* work, const Ngs2PanParam* params, uint32_t num_params, uint32_t matrix_format, float* out_volume_matrix) {
-    (void)work;
-    (void)params;
-    (void)num_params;
-    (void)matrix_format;
-    (void)out_volume_matrix;
-    NotImplemented_nid_no_patch(__func__);
-    return 0;
-}
-
-int APS5_VABI sceNgs2PanInit(Ngs2PanWork* work, const float* speaker_angles, float unit_angle, uint32_t num_speakers) {
-    (void)work;
-    (void)speaker_angles;
-    (void)unit_angle;
-    (void)num_speakers;
-    NotImplemented_nid_no_patch(__func__);
-    return 0;
-}
 
 }
 
